@@ -1,211 +1,196 @@
-var canvas, ctx;
-var game;
-const SIZE = 16;
+var ctx, player, room;
+var TILE_SIZE = 16;
+var BLACK = '#000000';
+var BLUE = '#3030f0';
+var GREEN = '#008000';
+var RED = '#f00000';
+var KEY_LEFT = 37;
+var KEY_UP = 38;
+var KEY_RIGHT = 39;
+var KEY_DOWN = 40;
 
-/* Called when the page loads */
-function init() {
-    canvas = document.getElementById('game');
-    ctx = canvas.getContext('2d');
-    var keyHandler = function(ev) { game.keypress(ev) };
-    if(window.document.addEventListener) {
-        window.document.addEventListener("keydown", keyHandler, false);
-    }
-    else {
-        window.document.attachEvent("onkeydown", keyHandler);
-    }
-    game = new Game();
-    newlevel();
-    setInterval(function() { game.render() }, 1000 / 60);
+function Tile() {
+    this.state = 0;
+}
+Tile.prototype = {
+    activate: function() {
+        if (this.state == 0) {
+            this.state = 1;
+        }
+        else {
+            throw 'NOPE';
+        }
+    },
+    block: function() {
+        this.state = 2;
+    },
+    deactivate: function() {
+        if (this.state == 1) {
+            this.state = 0;
+        }
+    },
+    getColor: function() {
+        return [BLUE, GREEN, BLACK][this.state];
+    },
 }
 
-function newlevel() {
-    game.level.generate();
-    game.posx = 0;
-    game.posy = 0;
-    game.level.visit(0, 0);
-    document.getElementById('win').innerHTML = "";
+function Room(size, obstacles) {
+    this.width = size[0];
+    this.height = size[1];
+    if (typeof obstacles === 'undefined') {
+        max_obstacles = Math.floor(this.width * this.height / 32);
+        obstacles = 1 + Math.floor(Math.random() * max_obstacles);
+    }
+    this.active_tiles = 0;
+    this.active_tiles_max = this.width * this.height - obstacles;
+
+    // Create tiles
+    this.tiles = {};
+    for (var x = 0; x < this.width; x++) {
+        for (var y = 0; y < this.height; y++) {
+            this.tiles[[x,y].join(',')] = new Tile();
+        }
+    }
+
+    // Create obstacles
+    while (obstacles > 0) {
+        var location = [
+            Math.floor(Math.random() * this.width),
+            Math.floor(Math.random() * this.height),
+        ];
+        this.tiles[location.join(',')].block();
+        obstacles--;
+    }
+}
+Room.prototype = {
+    activate: function(location) {
+        this.tiles[location.join(',')].activate();
+        self.active_tiles++;
+    },
+    deactivate: function(location) {
+        this.tiles[location.join(',')].deactivate();
+        self.active_tiles--;
+    },
+    isComplete: function() {
+        return (this.active_tiles == this.active_tiles_max);
+    },
+    reset: function() {
+        for (var key in this.tiles) {
+            this.tiles[key].deactivate();
+        }
+    },
+    draw: function(ctx) {
+        for (var x = 0; x < this.width; x++) {
+            for (var y = 0; y < this.height; y++) {
+                ctx.fillStyle = this.tiles[[x,y].join(',')].getColor();
+                ctx.fillRect(x * (TILE_SIZE + 1) + 1,
+                             y * (TILE_SIZE + 1) + 1,
+                             TILE_SIZE, TILE_SIZE);
+            }
+        }
+    },
 }
 
-function resetlevel() {
-    game.level.reset();
-    game.posx = 0;
-    game.posy = 0;
-    game.level.visit(0, 0);
-    document.getElementById('win').innerHTML = "";
+function Player(room, start_location) {
+    this.room = room;
+    if (typeof start_location === 'undefined') {
+        start_location = [0,0];
+    }
+    this.start_location = start_location;
+    this.location = start_location;
+    this.room.activate(this.location);
+}
+Player.prototype = {
+    draw: function(ctx) {
+        this.room.draw(ctx);
+        var x = this.location[0], y = this.location[1];
+        ctx.fillStyle = RED;
+        ctx.fillRect(x * (TILE_SIZE + 1) + 1,
+                     y * (TILE_SIZE + 1) + 1,
+                     TILE_SIZE, TILE_SIZE);
+        if (this.room.isComplete()) {
+            $('#win').show();
+        }
+        else {
+            $('#win').hide();
+        }
+    },
+    move: function(direction) {
+        var dx = direction[0], dy = direction[1];
+        var new_location = [player.location[0] + dx,
+                            player.location[1] + dy];
+        this.room.activate(new_location);
+        player.location = new_location;
+    },
+    reset: function() {
+        this.room.reset();
+        this.location = this.start_location;
+        this.room.activate(this.location);
+        this.draw(ctx);
+    },
 }
 
-/* Level constructor */
-var Level = function(width, height) {
-    this.width = width;
-    this.height = height;
-    this.map = [];
-};
-
-/* Level generation routine */
-Level.prototype.generate = function() {
-    this.genNoise();
-    while(this.impossible()) {
-        this.genNoise();
-    }
-};
-
-/* Random Level Generation */
-Level.prototype.genNoise = function() {
-    var blockfreq = Math.random() * 0.33;
-    for(var i = 0; i < this.width; i++) {
-        for(var j = 0; j < this.height; j++) {
-            var t = 0;
-            if(Math.random() < blockfreq) {
-                t = 2;
-            }
-            this.map[j * this.width + i] = t;
-        }
-    }
-};
-
-
-Level.prototype.impossible = function() {
-    var trapped = function(level, x, y) {
-        var x1 = x-1;
-        var x2 = x+1;
-        var y1 = y-1;
-        var y2 = y+1;
-
-        var count = 0;
-        if(x1 < 0 || !level.validMove(x1, y)) count++;
-        if(x2 >= level.width || !level.validMove(x2, y)) count++;
-        if(y1 < 0 || !level.validMove(x, y1)) count++;
-        if(y2 >= level.height || !level.validMove(x, y2)) count++;
-
-        return count > 2;
-    };
-
-    for(var i = 0; i < this.width; i++) {
-        for(var j = 0; j < this.width; j++) {
-            if(trapped(this, i, j)) {
-                return true;
-            }
-        }
-    }
-    return false;
-};
-
-/* Determine if a square is valid */
-Level.prototype.validMove = function(x, y) {
-    if(x < 0 || x >= this.width || y < 0 || y >= this.height) {
-        return false;
-    }
-    if(this.map[y * this.width + x] != 0) {
-        return false;
-    }
-    return true;
-};
-
-/* Visit a square */
-Level.prototype.visit = function(x, y) {
-    if(x < 0 || x >= this.width || y < 0 || y >= this.height) {
-        return;
-    }
-    this.map[y * this.width + x] = 1;
-};
-
-/* Check if the game has been won */
-Level.prototype.checkWin = function() {
-    for(var i = 0; i < this.width * this.height; i++) {
-        if(this.map[i] == 0) {
-            return false;
-        }
-    }
-    return true;
-};
-
-/* Reset the map */
-Level.prototype.reset = function() {
-    for(var i = 0; i < this.width * this.height; i++) {
-        if(this.map[i] == 1) {
-            this.map[i] = 0;
-        }
-    }
-};
-
-/* Clone the map */
-Level.prototype.clone = function() {
-    var lvl = new Level(this.width, this.height);
-
-    for(var i = 0; i < this.width * this.height; i++) {
-        lvl.map[i] = this.map[i];
-    }
-    return lvl;
-};
-
-/* Game constructor */
-var Game = function() {
-    this.level = new Level(8, 8);
-    this.posx = 0;
-    this.posy = 0;
-    this.level.visit(0, 0);
-};
-
-/* Game rendering routine */
-Game.prototype.render = function() {
-    for(var i = 0; i < this.level.width; i++) {
-        for(var j = 0; j < this.level.height; j++) {
-            var t = this.level.map[j * this.level.width + i];
-            var color;
-            switch(t) {
-                case 0:
-                    color = "#0000FF";
-                    break;
-                case 1:
-                    color = "#007700";
-                    break;
-                default:
-                    color = "#000000";
-            }
-            if(i == this.posx && j == this.posy) {
-                color = "#FF0000";
-            }
-            ctx.fillStyle = color;
-            ctx.fillRect(i * (SIZE + 1) + 1, j * (SIZE + 1) + 1, SIZE, SIZE);
-        }
-    }
-};
-
-/* Some key constants */
-const K_LEFT = 37;
-const K_UP = 38;
-const K_RIGHT = 39;
-const K_DOWN = 40;
-
-/* Game input handling */
-Game.prototype.keypress = function(ev) {
-    var key = ev.keyCode;
-    switch(key) {
-        case K_LEFT:
-            if(this.level.validMove(this.posx-1, this.posy)) {
-                this.posx--;
-            }
+function handleKey(ev) {
+    switch (ev.keyCode) {
+        case KEY_LEFT:
+            direction = [-1,0];
             break;
-        case K_RIGHT:
-            if(this.level.validMove(this.posx+1, this.posy)) {
-                this.posx++;
-            }
+        case KEY_UP:
+            direction = [0,-1];
             break;
-        case K_UP:
-            if(this.level.validMove(this.posx, this.posy-1)) {
-                this.posy--;
-            }
+        case KEY_RIGHT:
+            direction = [1,0];
             break;
-        case K_DOWN:
-            if(this.level.validMove(this.posx, this.posy+1)) {
-                this.posy++;
-            }
+        case KEY_DOWN:
+            direction = [0,1];
             break;
         default:
-            break;
+            return true;
     }
-    this.level.visit(this.posx, this.posy);
-    if(this.level.checkWin()) {
-        document.getElementById('win').innerHTML = "You Win!";
+    try {
+        player.move(direction);
     }
-};
+    catch (e) {
+        return true;
+    }
+    player.draw(ctx);
+}
+
+function hasSolution(room, location) {
+    if (typeof location === 'undefined') {
+        location = [0,0];
+    }
+    try {
+        room.activate(location);
+    }
+    catch (e) {
+        return false;
+    }
+    if (room.isComplete()) {
+        return true;
+    }
+    var x = location[0], y = location[1];
+    result = (hasSolution(room, [x+1,y]) ||
+              hasSolution(room, [x-1,y]) ||
+              hasSolution(room, [x,y+1]) ||
+              hasSolution(room, [x,y-1]));
+    if (!result) {
+        room.deactivate(location);
+    }
+    return result;
+}
+
+function newRoom() {
+    player = new Player(new Room([8,8]));
+    $('#reset').click(function() {
+        player.reset()
+    });
+    player.draw(ctx);
+}
+
+$(document).ready(function() {
+    ctx = $('#game')[0].getContext('2d');
+    $('#new').click(newRoom);
+    $(document).keydown(handleKey);
+    newRoom();
+});
