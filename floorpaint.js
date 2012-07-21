@@ -1,4 +1,4 @@
-var ctx, player, room;
+var ctx, player;
 var TILE_SIZE = 16;
 var BLACK = '#000000';
 var BLUE = '#3030f0';
@@ -22,7 +22,12 @@ Tile.prototype = {
         }
     },
     block: function() {
-        this.state = 2;
+        if (this.state == 0) {
+            this.state = 2;
+        }
+        else {
+            throw 'NOPE';
+        }
     },
     deactivate: function() {
         if (this.state == 1) {
@@ -58,21 +63,25 @@ function Room(size, obstacles) {
             Math.floor(Math.random() * this.width),
             Math.floor(Math.random() * this.height),
         ];
-        this.tiles[location.join(',')].block();
-        obstacles--;
+        try {
+            this.tiles[location.join(',')].block();
+            obstacles--;
+        }
+        catch (e) {
+        }
     }
 }
 Room.prototype = {
     activate: function(location) {
         this.tiles[location.join(',')].activate();
-        self.active_tiles++;
+        this.active_tiles++;
     },
     deactivate: function(location) {
         this.tiles[location.join(',')].deactivate();
-        self.active_tiles--;
+        this.active_tiles--;
     },
     isComplete: function() {
-        return (this.active_tiles == this.active_tiles_max);
+        return (this.active_tiles > this.active_tiles_max);
     },
     reset: function() {
         for (var key in this.tiles) {
@@ -88,6 +97,12 @@ Room.prototype = {
                              TILE_SIZE, TILE_SIZE);
             }
         }
+        if (this.room.isComplete()) {
+            $('#win').show('fast');
+        }
+        else {
+            $('#win').hide();
+        }
     },
 }
 
@@ -98,7 +113,7 @@ function Player(room, start_location) {
     }
     this.start_location = start_location;
     this.location = start_location;
-    this.room.activate(this.location);
+    this.move([0,0]);
 }
 Player.prototype = {
     draw: function(ctx) {
@@ -108,25 +123,19 @@ Player.prototype = {
         ctx.fillRect(x * (TILE_SIZE + 1) + 1,
                      y * (TILE_SIZE + 1) + 1,
                      TILE_SIZE, TILE_SIZE);
-        if (this.room.isComplete()) {
-            $('#win').show();
-        }
-        else {
-            $('#win').hide();
-        }
     },
     move: function(direction) {
         var dx = direction[0], dy = direction[1];
-        var new_location = [player.location[0] + dx,
-                            player.location[1] + dy];
+        var new_location = [this.location[0] + dx,
+                            this.location[1] + dy];
         this.room.activate(new_location);
-        player.location = new_location;
+        this.location = new_location;
+        this.draw(ctx);
     },
     reset: function() {
         this.room.reset();
         this.location = this.start_location;
-        this.room.activate(this.location);
-        this.draw(ctx);
+        this.move([0,0]);
     },
 }
 
@@ -153,7 +162,6 @@ function handleKey(ev) {
     catch (e) {
         return true;
     }
-    player.draw(ctx);
 }
 
 function hasSolution(room, location) {
@@ -185,7 +193,6 @@ function newRoom() {
     $('#reset').click(function() {
         player.reset()
     });
-    player.draw(ctx);
 }
 
 $(document).ready(function() {
