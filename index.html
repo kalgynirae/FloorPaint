@@ -2,6 +2,7 @@
 <html>
     <head>
         <title>Floor Paint DEMO</title>
+        <meta charset="utf-8" />
         <link rel="stylesheet" href="style.css" type="text/css" />
     </head>
     <body>
@@ -9,12 +10,13 @@
         <canvas id="game" width="137" height="137">
             Your browser does not support HTML5 canvas.
         </canvas>
-        <h2 id="win">You win!</h2>
+        <p id="status">&nbsp;</p>
         <p>
-          <button id="reset">Start Over</button>
-          <button id="new">New Level</button>
+          <button id="reset">Reset</button>
+          <button id="check">Check for solution (probably slow)</button>
         </p>
-        <script src="http://code.jquery.com/jquery-latest.js"></script>
-        <script src="floorpaint.js" type="text/javascript"></script>
+        <p>Reload the page for a new puzzle.</p>
     </body>
+    <script src="http://code.jquery.com/jquery-latest.js" type="text/javascript"></script>
+    <script src="floorpaint.js" type="text/javascript"></script>
 </html>
