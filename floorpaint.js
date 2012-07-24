@@ -45,27 +45,37 @@ function Room($status, size, start_location, obstacles) {
     this.active_tiles = 0;
     this.active_tiles_max = this.width * this.height - obstacles;
 
-    // Create tiles
-    this.tiles = {};
-    for (var x = 0; x < this.width; x++) {
-        for (var y = 0; y < this.height; y++) {
-            this.tiles[[x,y].join(',')] = new Tile();
-        }
-    }
-
-    // Create obstacles
-    while (obstacles > 0) {
-        var location = [
-            Math.floor(Math.random() * this.width),
-            Math.floor(Math.random() * this.height),
-        ];
-        if (location[0] != start_location[0] && location[1] != start_location[1]) {
-            var blocked = this.tiles[location.join(',')].block();
-            if (blocked) {
-                obstacles--;
+    var solvable;
+    do {
+        // Create tiles
+        this.tiles = {};
+        for (var x = 0; x < this.width; x++) {
+            for (var y = 0; y < this.height; y++) {
+                this.tiles[[x,y].join(',')] = new Tile();
             }
         }
+
+        // Create obstacles
+        this.obstacle_keys = [];
+        var remaining_obstacles = obstacles;
+        while (remaining_obstacles > 0) {
+            var location = [
+                Math.floor(Math.random() * this.width),
+                Math.floor(Math.random() * this.height),
+            ];
+            if (location[0] != start_location[0] ||
+                    location[1] != start_location[1]) {
+                var blocked = this.tiles[location.join(',')].block();
+                if (blocked) {
+                    this.obstacle_keys.push(location.join(','));
+                    remaining_obstacles--;
+                }
+            }
+        }
+
+        solvable = hasQuickSolution(this, start_location);
     }
+    while (!(solvable == true || solvable == -1));
 }
 Room.prototype = {
     activate: function(location) {
@@ -183,6 +193,19 @@ function hasSolution(room, location) {
     return result;
 }
 
+function hasQuickSolution(room, start_location) {
+    if (room.obstacle_keys.length == 1) {
+        obstacle_key = room.obstacle_keys[0].split(',');
+        obstaclex = parseInt(obstacle_key[0]);
+        obstacley = parseInt(obstacle_key[1]);
+        var odd_placement = (Math.abs((obstaclex - start_location[0]) % 2) !=
+                             Math.abs((obstacley - start_location[1]) % 2));
+        //return ((room.width + room.height) % 2 == 1) ? odd_placement : !odd_placement;
+        return odd_placement;
+    }
+    return -1;
+}
+
 // Get settings from the query string
 var params = {};
 if (window.location.search) {
@@ -194,6 +217,7 @@ if (window.location.search) {
         params[s[0]] = s[1];
     }
 }
+
 // Parse settings
 var pwidth = parseInt(params['width']);
 var pheight = parseInt(params['height']);
@@ -203,6 +227,7 @@ var width = !isNaN(pwidth) ? pwidth : 6;
 var height = !isNaN(pheight) ? pheight : 6;
 var startx = !isNaN(pstartx) ? pstartx : 0;
 var starty = !isNaN(pstarty) ? pstarty : 0;
+var start_location = [startx,starty];
 
 $('#game')[0].width = width * (TILE_SIZE + 1) + 1;
 $('#game')[0].height = height * (TILE_SIZE + 1) + 1;
@@ -211,8 +236,8 @@ $('#game')[0].height = height * (TILE_SIZE + 1) + 1;
 var $document = $(document)
 var $status = $('#status');
 var context = $('#game')[0].getContext('2d');
-var room = new Room($status, [width,height], [startx,starty]);
-var player = new Player(room, [startx,starty], context);
+var room = new Room($status, [width,height], start_location);
+var player = new Player(room, start_location, context);
 var handleKeyCallback = function(ev) {
     handleKey(ev, player);
 };
@@ -224,7 +249,8 @@ $('#check').click(function() {
     $status.text("checking...");
     $document.unbind('keydown');
     room.reset();
-    $status.text(hasSolution(player.room, [0,0]) ? 'yup!' : 'nope.');
+    var solution = hasSolution(player.room, [startx,starty]);
+    $status.text(solution ? "yup, there's a solution!" : "no solution.");
     player.reset();
     $document.keydown(handleKeyCallback);
 });
