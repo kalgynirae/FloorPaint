@@ -34,7 +34,7 @@ Tile.prototype = {
     },
 }
 
-function Room($status, size, obstacles) {
+function Room($status, size, start_location, obstacles) {
     this.$status = $status;
     this.width = size[0];
     this.height = size[1];
@@ -59,9 +59,11 @@ function Room($status, size, obstacles) {
             Math.floor(Math.random() * this.width),
             Math.floor(Math.random() * this.height),
         ];
-        var blocked = this.tiles[location.join(',')].block();
-        if (blocked) {
-            obstacles--;
+        if (location[0] != start_location[0] && location[1] != start_location[1]) {
+            var blocked = this.tiles[location.join(',')].block();
+            if (blocked) {
+                obstacles--;
+            }
         }
     }
 }
@@ -209,7 +211,7 @@ $('#game')[0].height = height * (TILE_SIZE + 1) + 1;
 var $document = $(document)
 var $status = $('#status');
 var context = $('#game')[0].getContext('2d');
-var room = new Room($status, [width,height]);
+var room = new Room($status, [width,height], [startx,starty]);
 var player = new Player(room, [startx,starty], context);
 var handleKeyCallback = function(ev) {
     handleKey(ev, player);
