@@ -38,7 +38,7 @@ function Room($status, size, start_location, obstacles) {
     this.$status = $status;
     this.width = size[0];
     this.height = size[1];
-    if (typeof obstacles === 'undefined') {
+    if (obstacles == -1) {
         max_obstacles = Math.floor(this.width * this.height / 32);
         obstacles = 1 + Math.floor(Math.random() * max_obstacles);
     }
@@ -74,6 +74,9 @@ function Room($status, size, start_location, obstacles) {
         }
 
         solvable = hasQuickSolution(this, start_location);
+        if (solvable == true) {
+            $status.text("solution known");
+        }
     }
     while (!(solvable == true || solvable == -1));
 }
@@ -223,11 +226,13 @@ var pwidth = parseInt(params['width']);
 var pheight = parseInt(params['height']);
 var pstartx = parseInt(params['startx']);
 var pstarty = parseInt(params['starty']);
+var pobstacles = parseInt(params['obstacles']);
 var width = !isNaN(pwidth) ? pwidth : 6;
 var height = !isNaN(pheight) ? pheight : 6;
 var startx = !isNaN(pstartx) ? pstartx : 0;
 var starty = !isNaN(pstarty) ? pstarty : 0;
 var start_location = [startx,starty];
+var obstacles = !isNaN(pobstacles) ? pobstacles : -1;
 
 $('#game')[0].width = width * (TILE_SIZE + 1) + 1;
 $('#game')[0].height = height * (TILE_SIZE + 1) + 1;
@@ -236,7 +241,7 @@ $('#game')[0].height = height * (TILE_SIZE + 1) + 1;
 var $document = $(document)
 var $status = $('#status');
 var context = $('#game')[0].getContext('2d');
-var room = new Room($status, [width,height], start_location);
+var room = new Room($status, [width,height], start_location, obstacles);
 var player = new Player(room, start_location, context);
 var handleKeyCallback = function(ev) {
     handleKey(ev, player);
