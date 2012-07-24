@@ -181,26 +181,49 @@ function hasSolution(room, location) {
     return result;
 }
 
-$(document).ready(function() {
-    $document = $(document)
-    context = $('#game')[0].getContext('2d');
-    $status = $('#status');
-    room = new Room($status, [6,6]);
-    player = new Player(room, [0,0], context);
-    handleKeyCallback = function(ev) {
-        handleKey(ev, player);
-    };
-    $('#reset').click(function() {
-        player.reset();
-        $status.text(" ");
-    });
-    $('#check').click(function() {
-        $status.text("checking...");
-        $document.unbind('keydown');
-        room.reset();
-        $status.text(hasSolution(player.room, [0,0]) ? 'yup!' : 'nope.');
-        player.reset();
-        $document.keydown(handleKeyCallback);
-    });
+// Get settings from the query string
+var params = {};
+if (window.location.search) {
+    var parameters = window.location.search.substring(1).split('&');
+    for (var i=0; i < parameters.length; i++) {
+        var s = parameters[i].split('=');
+        if (s.length != 2)
+            continue;
+        params[s[0]] = s[1];
+    }
+}
+// Parse settings
+var pwidth = parseInt(params['width']);
+var pheight = parseInt(params['height']);
+var pstartx = parseInt(params['startx']);
+var pstarty = parseInt(params['starty']);
+var width = !isNaN(pwidth) ? pwidth : 6;
+var height = !isNaN(pheight) ? pheight : 6;
+var startx = !isNaN(pstartx) ? pstartx : 0;
+var starty = !isNaN(pstarty) ? pstarty : 0;
+
+$('#game')[0].width = width * (TILE_SIZE + 1) + 1;
+$('#game')[0].height = height * (TILE_SIZE + 1) + 1;
+
+// Generate a level and set callbacks
+var $document = $(document)
+var $status = $('#status');
+var context = $('#game')[0].getContext('2d');
+var room = new Room($status, [width,height]);
+var player = new Player(room, [startx,starty], context);
+var handleKeyCallback = function(ev) {
+    handleKey(ev, player);
+};
+$('#reset').click(function() {
+    player.reset();
+    $status.text(" "); // That's a non-breaking space there
+});
+$('#check').click(function() {
+    $status.text("checking...");
+    $document.unbind('keydown');
+    room.reset();
+    $status.text(hasSolution(player.room, [0,0]) ? 'yup!' : 'nope.');
+    player.reset();
     $document.keydown(handleKeyCallback);
 });
+$document.keydown(handleKeyCallback);
